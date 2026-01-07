@@ -1005,8 +1005,8 @@ html, body, #root {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
   z-index: 10000;
+  pointer-events: none;
   animation: fadeIn 0.3s ease;
 }
 
@@ -1015,73 +1015,85 @@ html, body, #root {
   to { opacity: 1; }
 }
 
-/* Spotlight effect - highlights target area */
+/* Spotlight - creates darkness everywhere EXCEPT the highlighted area */
 .tutorial-spotlight {
-  position: absolute;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75);
+  position: fixed;
+  background: transparent;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.8);
+  border: 3px solid #4285f4;
   pointer-events: none;
+  transition: all 0.3s ease;
 }
 
+/* Step 1: Locate button - bottom right */
 .tutorial-spotlight.locate-btn {
-  bottom: 80px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius);
+  bottom: 76px;
+  right: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
 }
 
+/* Step 2: Zoom controls */
+.tutorial-spotlight.zoom-controls {
+  bottom: 130px;
+  right: 10px;
+  width: 38px;
+  height: 78px;
+  border-radius: 8px;
+}
+
+/* Step 3: Map area - center of screen */
 .tutorial-spotlight.map-area {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 200px;
-  height: 200px;
-  border-radius: var(--radius-full);
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
 }
 
+/* Step 4: Search bar */
 .tutorial-spotlight.search-form {
   top: 8px;
-  left: 100px;
-  right: 12px;
-  height: 40px;
-  border-radius: var(--radius-full);
+  left: 90px;
+  right: 10px;
+  height: 42px;
+  border-radius: 24px;
 }
 
+/* Step 5: Filter buttons */
 .tutorial-spotlight.category-filters {
-  bottom: 20px;
-  left: 12px;
-  right: 64px;
-  height: 50px;
-  border-radius: var(--radius-full);
+  bottom: 16px;
+  left: 10px;
+  right: 60px;
+  height: 44px;
+  border-radius: 24px;
 }
 
-.tutorial-spotlight.sidebar-area {
+/* Step 6: Sidebar */
+.tutorial-spotlight.sidebar-results {
   top: 56px;
   left: 0;
-  width: 85%;
+  width: 85vw;
   max-width: 320px;
-  height: calc(100% - 56px);
+  height: calc(100vh - 56px);
   border-radius: 0;
-}
-
-.tutorial-spotlight.zoom-controls {
-  bottom: 140px;
-  right: 12px;
-  width: 44px;
-  height: 88px;
-  border-radius: var(--radius);
+  border-left: none;
 }
 
 /* Tooltip */
 .tutorial-tooltip {
-  position: absolute;
+  position: fixed;
   width: 280px;
-  background: var(--surface);
-  border-radius: var(--radius-lg);
+  background: white;
+  border-radius: 16px;
   padding: 20px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.3s ease;
+  z-index: 10001;
+  pointer-events: auto;
 }
 
 @keyframes slideUp {
@@ -1101,10 +1113,15 @@ html, body, #root {
   right: 70px;
 }
 
+.tutorial-tooltip[data-target="zoom-controls"] {
+  bottom: 220px;
+  right: 70px;
+}
+
 .tutorial-tooltip[data-target="map-area"] {
-  top: 50%;
+  top: calc(50% + 110px);
   left: 50%;
-  transform: translate(-50%, 120px);
+  transform: translateX(-50%);
 }
 
 .tutorial-tooltip[data-target="search-form"] {
@@ -1114,26 +1131,21 @@ html, body, #root {
 }
 
 .tutorial-tooltip[data-target="category-filters"] {
-  bottom: 90px;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
 }
 
-.tutorial-tooltip[data-target="sidebar-area"] {
+.tutorial-tooltip[data-target="sidebar-results"] {
   top: 50%;
-  left: min(330px, 90%);
+  left: min(340px, calc(85vw + 20px));
   transform: translateY(-50%);
-}
-
-.tutorial-tooltip[data-target="zoom-controls"] {
-  bottom: 200px;
-  right: 70px;
 }
 
 .tutorial-step {
   font-size: 11px;
   font-weight: 600;
-  color: var(--primary);
+  color: #4285f4;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
@@ -1142,13 +1154,13 @@ html, body, #root {
 .tutorial-tooltip h3 {
   font-size: 18px;
   font-weight: 600;
-  color: var(--text);
+  color: #1a1a1a;
   margin-bottom: 8px;
 }
 
 .tutorial-tooltip p {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #5f6368;
   line-height: 1.5;
   margin-bottom: 16px;
 }
@@ -1161,25 +1173,25 @@ html, body, #root {
 
 .tutorial-skip {
   padding: 10px 16px;
-  background: none;
+  background: #f1f3f4;
   border: none;
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: #5f6368;
   cursor: pointer;
-  border-radius: var(--radius);
+  border-radius: 8px;
   transition: background 0.15s;
 }
 
-.tutorial-skip:active {
-  background: var(--bg);
+.tutorial-skip:hover {
+  background: #e8eaed;
 }
 
 .tutorial-next {
   padding: 10px 20px;
-  background: var(--primary);
+  background: #4285f4;
   border: none;
-  border-radius: var(--radius);
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   color: white;
@@ -1187,26 +1199,36 @@ html, body, #root {
   transition: background 0.15s, transform 0.15s;
 }
 
-.tutorial-next:active {
-  background: var(--primary-dark);
-  transform: scale(0.98);
+.tutorial-next:hover {
+  background: #3367d6;
 }
 
 /* Mobile adjustments for tutorial */
-@media (max-width: 400px) {
+@media (max-width: 480px) {
   .tutorial-tooltip {
     width: 260px;
     padding: 16px;
+    max-width: calc(100vw - 40px);
   }
   
-  .tutorial-tooltip[data-target="sidebar-area"] {
+  .tutorial-tooltip[data-target="sidebar-results"] {
     left: 50%;
-    transform: translate(-50%, -50%);
+    top: auto;
+    bottom: 80px;
+    transform: translateX(-50%);
   }
   
-  .tutorial-tooltip[data-target="locate-btn"],
+  .tutorial-tooltip[data-target="locate-btn"] {
+    bottom: 140px;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
   .tutorial-tooltip[data-target="zoom-controls"] {
-    right: 50%;
-    transform: translateX(50%);
+    bottom: 230px;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }

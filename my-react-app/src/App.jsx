@@ -194,44 +194,38 @@ function App() {
     {
       id: 1,
       target: 'locate-btn',
-      title: 'Find Your Location',
-      description: 'Tap this button to find where you are. This sets your starting point for searches and directions.',
-      position: 'left'
+      title: '1. Find Your Location',
+      description: 'Tap this button to find where you are. This sets your starting point for nearby searches.',
     },
     {
       id: 2,
-      target: 'map-area',
-      title: 'Drop a Pin',
-      description: 'Tap anywhere on the map to drop a pin. This becomes your new reference point for nearby searches.',
-      position: 'center'
+      target: 'zoom-controls',
+      title: '2. Zoom Controls',
+      description: 'Use + and − to zoom in and out of the map for a closer or wider view.',
     },
     {
       id: 3,
-      target: 'search-form',
-      title: 'Search Places',
-      description: 'Type any place name to search. Results show the nearest locations to your pin or location.',
-      position: 'bottom'
+      target: 'map-area',
+      title: '3. Drop a Pin',
+      description: 'Tap anywhere on the map to drop a pin. This becomes your reference point for finding nearby places.',
     },
     {
       id: 4,
-      target: 'category-filters',
-      title: 'Quick Filters',
-      description: 'Tap these buttons to find nearby churches, restaurants, gas stations, and more!',
-      position: 'top'
+      target: 'search-form',
+      title: '4. Search Places',
+      description: 'Type any place name to search. Results are sorted by distance from your location or pin.',
     },
     {
       id: 5,
-      target: 'sidebar-area',
-      title: 'View Results',
-      description: 'Tap any result to see options: Locate (go there), Route (get directions), or Share (copy location).',
-      position: 'right'
+      target: 'category-filters',
+      title: '5. Quick Filters',
+      description: 'Tap these to quickly find nearby churches, food, hospitals, gas stations, ATMs, and pharmacies!',
     },
     {
       id: 6,
-      target: 'zoom-controls',
-      title: 'Zoom Controls',
-      description: 'Use + and − to zoom in and out of the map.',
-      position: 'left'
+      target: 'sidebar-results',
+      title: '6. Choose an Action',
+      description: 'Tap a result to see 3 buttons: Locate (fly there), Route (get directions), or Share (copy info).',
     }
   ]
   
@@ -656,7 +650,7 @@ function App() {
       {currentTutorial && (
         <div className="tutorial-overlay">
           <div className={`tutorial-spotlight ${currentTutorial.target}`} />
-          <div className={`tutorial-tooltip ${currentTutorial.position}`} data-target={currentTutorial.target}>
+          <div className="tutorial-tooltip" data-target={currentTutorial.target}>
             <div className="tutorial-step">Step {tutorialStep} of {tutorialSteps.length}</div>
             <h3>{currentTutorial.title}</h3>
             <p>{currentTutorial.description}</p>
