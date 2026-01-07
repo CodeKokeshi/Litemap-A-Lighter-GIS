@@ -44,6 +44,29 @@ html, body, #root {
   background: var(--bg);
 }
 
+/* Animation blocking overlay */
+.animation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 9999;
+  pointer-events: all;
+  cursor: wait;
+}
+
+/* Disable interactions during animation */
+.app.animating .header,
+.app.animating .sidebar,
+.app.animating .zoom-controls,
+.app.animating .locate-btn,
+.app.animating .category-filters-wrapper {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
 /* ========== HEADER - Mobile Optimized ========== */
 .header {
   display: flex;
@@ -316,6 +339,18 @@ html, body, #root {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Distance badge */
+.result-distance {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: var(--bg);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
 }
 
 /* Place Card - Bottom Sheet Style */

@@ -4,9 +4,15 @@
  * INTERACTION TYPES:
  * 1. MANIPULATING - Direct manipulation of the map (drag, zoom, pinch)
  * 2. INSTRUCTING - Commands via search, buttons, forms
+ * 
+ * BIAS SYSTEM:
+ * - All searches/filters are based on a "bias point"
+ * - Bias point is either: user location (blue) OR dropped pin (orange)
+ * - Dropping a pin replaces user location as bias
+ * - Pressing locate me sets user location as bias
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import './App.css'
 
 // Leaflet imports
@@ -37,85 +43,124 @@ const blueIcon = createIcon('blue')
 const greenIcon = createIcon('green')
 const orangeIcon = createIcon('orange')
 
-// Component to handle map events and controls
-function MapController({ center, zoom, onMapClick, onLocationFound, onMapMove }) {
-  const map = useMap()
-  
-  useMapEvents({
-    click: (e) => {
-      onMapClick(e.latlng)
-    },
-    locationfound: (e) => {
-      onLocationFound(e.latlng)
-      map.flyTo(e.latlng, 15)
-    },
-    moveend: () => {
-      // Track the actual map center when user pans/zooms
-      const center = map.getCenter()
-      onMapMove([center.lat, center.lng])
-    }
-  })
+// Haversine formula - calculates accurate distance between two lat/lon points
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371 // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  return R * c
+}
 
-  // Update map view when center/zoom changes
-  if (center) {
-    map.flyTo(center, zoom || map.getZoom())
+// Format distance for display
+function formatDistance(km) {
+  if (km < 1) {
+    return `${Math.round(km * 1000)} m`
+  } else if (km < 10) {
+    return `${km.toFixed(1)} km`
+  } else {
+    return `${Math.round(km)} km`
   }
+}
 
+// Component to store map instance reference
+function MapInstanceGrabber({ onMapReady }) {
+  const map = useMap()
+  useEffect(() => {
+    onMapReady(map)
+  }, [map, onMapReady])
   return null
 }
 
-// Zoom control component
-function ZoomControls() {
-  const map = useMap()
-  
-  return (
-    <div className="zoom-controls" onClick={(e) => e.stopPropagation()}>
-      <button 
-        onClick={(e) => { e.stopPropagation(); map.zoomIn(); }} 
-        aria-label="Zoom in"
-      >
-        +
-      </button>
-      <button 
-        onClick={(e) => { e.stopPropagation(); map.zoomOut(); }} 
-        aria-label="Zoom out"
-      >
-        −
-      </button>
-    </div>
-  )
+// Component to handle map click events - checks if click is on map tiles only
+function MapClickHandler({ onMapClick, disabled }) {
+  useMapEvents({
+    click: (e) => {
+      if (disabled) return
+      // Check if click originated from a control, button, or marker
+      const target = e.originalEvent?.target
+      if (!target) return
+      
+      const isControl = target.closest('.leaflet-control') || 
+                       target.closest('.zoom-controls') || 
+                       target.closest('.locate-btn') ||
+                       target.closest('.leaflet-marker-icon') ||
+                       target.closest('.leaflet-popup') ||
+                       target.closest('button')
+      
+      if (!isControl) {
+        onMapClick(e.latlng)
+      }
+    }
+  })
+  return null
 }
 
-// Locate me button
-function LocateButton({ onLocate }) {
+// Component to handle flying to location with animation
+function FlyToHandler({ flyTarget, onComplete }) {
   const map = useMap()
   
-  const handleLocate = (e) => {
-    e.stopPropagation()
-    map.locate({ setView: false })
-    onLocate()
-  }
+  useEffect(() => {
+    if (flyTarget) {
+      map.flyTo(flyTarget.position, flyTarget.zoom, { duration: 1.2 })
+      
+      const timeout = setTimeout(() => {
+        if (onComplete) onComplete()
+      }, 1300)
+      
+      return () => clearTimeout(timeout)
+    }
+  }, [flyTarget, map, onComplete])
   
-  return (
-    <button 
-      className="locate-btn"
-      onClick={handleLocate}
-      aria-label="Find my location"
-    >
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-        <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
-      </svg>
-    </button>
-  )
+  return null
+}
+
+// Component to request geolocation
+function GeolocateHandler({ trigger, onLocated, onError }) {
+  const map = useMap()
+  
+  useEffect(() => {
+    if (trigger) {
+      map.locate({ setView: false, enableHighAccuracy: true })
+    }
+  }, [trigger, map])
+  
+  useMapEvents({
+    locationfound: (e) => {
+      onLocated([e.latlng.lat, e.latlng.lng])
+    },
+    locationerror: (e) => {
+      console.error('Location error:', e.message)
+      if (onError) onError(e.message)
+    }
+  })
+  
+  return null
 }
 
 function App() {
-  // Map state
-  const [mapCenter, setMapCenter] = useState([14.5995, 120.9842]) // Manila, Philippines
-  const [currentViewCenter, setCurrentViewCenter] = useState([14.5995, 120.9842]) // Tracks actual map view
-  const [mapZoom, setMapZoom] = useState(13)
-  const [markers, setMarkers] = useState([])
-  const [userLocation, setUserLocation] = useState(null)
+  // Map initial center (Carmona, Cavite area)
+  const [mapCenter] = useState([14.4324, 120.9619])
+  
+  // Bias point - the reference location for all searches
+  // Can be either user location or dropped pin location
+  const [biasLocation, setBiasLocation] = useState(null)
+  const [biasType, setBiasType] = useState(null) // 'user' or 'dropped'
+  
+  // Fly animation state
+  const [flyTarget, setFlyTarget] = useState(null)
+  const [isAnimating, setIsAnimating] = useState(false)
+  
+  // Geolocation trigger
+  const [geoTrigger, setGeoTrigger] = useState(0)
+  
+  // Markers
+  const [filterMarkers, setFilterMarkers] = useState([])
+  const [searchMarker, setSearchMarker] = useState(null)
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -123,157 +168,80 @@ function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [activeFilter, setActiveFilter] = useState(null)
 
-  // Category filters - INSTRUCTING examples
+  // Category filters
   const categories = [
+    { id: 'church', label: 'Church', icon: '⛪' },
     { id: 'restaurant', label: 'Food', icon: '🍔' },
     { id: 'hospital', label: 'Hospital', icon: '🏥' },
     { id: 'fuel', label: 'Gas', icon: '⛽' },
     { id: 'atm', label: 'ATM', icon: '🏧' },
     { id: 'pharmacy', label: 'Pharmacy', icon: '💊' },
-    { id: 'parking', label: 'Parking', icon: '🅿️' },
   ]
   
   // UI state
-  const [showSidebar, setShowSidebar] = useState(true)
+  const [showSidebar, setShowSidebar] = useState(false)
   const [selectedPlace, setSelectedPlace] = useState(null)
   
-  const searchInputRef = useRef(null)
-
-  // Search for places using Nominatim (free OpenStreetMap geocoding)
-  const handleSearch = async (e) => {
-    e.preventDefault()
-    if (!searchQuery.trim()) return
-    
-    setActiveFilter(null) // Clear filter when searching
-    setIsSearching(true)
-    try {
-      // Search with strong local bias using current view center
-      const [lat, lon] = currentViewCenter
-      // Use bounded=1 to strictly limit to viewbox area
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=10&viewbox=${lon-0.15},${lat+0.15},${lon+0.15},${lat-0.15}&bounded=1`
-      )
-      let data = await response.json()
-      
-      // If no local results, try a wider search with country bias
-      if (data.length === 0) {
-        const fallbackResponse = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=10&countrycodes=ph&viewbox=${lon-1},${lat+1},${lon+1},${lat-1}`
-        )
-        data = await fallbackResponse.json()
-      }
-      
-      // Sort results by distance from current view
-      data.sort((a, b) => {
-        const distA = Math.sqrt(Math.pow(parseFloat(a.lat) - lat, 2) + Math.pow(parseFloat(a.lon) - lon, 2))
-        const distB = Math.sqrt(Math.pow(parseFloat(b.lat) - lat, 2) + Math.pow(parseFloat(b.lon) - lon, 2))
-        return distA - distB
-      })
-      
-      setSearchResults(data.slice(0, 5))
-      setShowSidebar(true)
-      
-      // If results found, zoom to first result
-      if (data.length > 0) {
-        const first = data[0]
-        setMapCenter([parseFloat(first.lat), parseFloat(first.lon)])
-        setMapZoom(16)
-      }
-    } catch (error) {
-      console.error('Search failed:', error)
+  // Map instance ref (not MapContainer, actual Leaflet map)
+  const mapInstanceRef = useRef(null)
+  
+  const handleMapReady = useCallback((map) => {
+    mapInstanceRef.current = map
+  }, [])
+  
+  // Zoom functions
+  const handleZoomIn = useCallback(() => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.zoomIn()
     }
-    setIsSearching(false)
-  }
-
-  // Filter by category - INSTRUCTING interaction
-  const handleCategoryFilter = async (category) => {
-    if (activeFilter === category.id) {
-      setActiveFilter(null)
-      setSearchResults([])
-      // Clear filter markers when deselecting
-      setMarkers(prev => prev.filter(m => m.type !== 'filter'))
-      return
+  }, [])
+  
+  const handleZoomOut = useCallback(() => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.zoomOut()
     }
-    
-    setActiveFilter(category.id)
-    setSearchQuery('')
-    setIsSearching(true)
-    
-    try {
-      // Search near CURRENT map view with larger radius
-      const [lat, lon] = currentViewCenter
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=15&viewbox=${lon-0.2},${lat+0.2},${lon+0.2},${lat-0.2}&bounded=1`
-      )
-      let data = await response.json()
-      
-      // Sort by distance from current view
-      data.sort((a, b) => {
-        const distA = Math.sqrt(Math.pow(parseFloat(a.lat) - lat, 2) + Math.pow(parseFloat(a.lon) - lon, 2))
-        const distB = Math.sqrt(Math.pow(parseFloat(b.lat) - lat, 2) + Math.pow(parseFloat(b.lon) - lon, 2))
-        return distA - distB
-      })
-      
-      data = data.slice(0, 8)
-      setSearchResults(data)
-      
-      // Auto-drop pins for filter results on the map
-      const filterMarkers = data.map((result, index) => ({
-        id: `filter-${index}`,
-        position: [parseFloat(result.lat), parseFloat(result.lon)],
-        name: result.display_name.split(',')[0],
-        type: 'filter'
-      }))
-      // Replace old filter markers with new ones
-      setMarkers(prev => [...prev.filter(m => m.type !== 'filter'), ...filterMarkers])
-      
-    } catch (error) {
-      console.error('Filter search failed:', error)
-    }
-    setIsSearching(false)
-  }
+  }, [])
 
-  // Handle clicking on a search result - fly to location with animation
-  const handleResultClick = (result) => {
-    const lat = parseFloat(result.lat)
-    const lon = parseFloat(result.lon)
-    
-    // Close sidebar first to see the animation
+  // Fly to a location with animation
+  const flyTo = useCallback((position, zoom = 16) => {
+    setIsAnimating(true)
     setShowSidebar(false)
-    
-    // Small delay then fly to location
-    setTimeout(() => {
-      setMapCenter([lat, lon])
-      setMapZoom(17)
-    }, 150)
-    
-    setSelectedPlace({
-      name: result.display_name.split(',')[0],
-      address: result.display_name,
-      lat,
-      lon
-    })
-    // Add marker
-    setMarkers(prev => [...prev.filter(m => m.id !== 'search'), {
-      id: 'search',
-      position: [lat, lon],
-      name: result.display_name.split(',')[0],
-      type: 'search'
-    }])
-  }
+    setFlyTarget({ position, zoom, timestamp: Date.now() })
+  }, [])
+  
+  // Animation complete handler
+  const handleFlyComplete = useCallback(() => {
+    setIsAnimating(false)
+    setFlyTarget(null)
+  }, [])
 
-  // Handle map click - drop a pin and get location info
-  const handleMapClick = async (latlng) => {
-    const { lat, lng } = latlng
+  // Handle locate me button press
+  const handleLocateMe = useCallback(() => {
+    if (isAnimating) return
+    setIsAnimating(true)
+    setGeoTrigger(prev => prev + 1) // Increment to trigger new locate
+  }, [isAnimating])
+
+  // When user location is found
+  const handleLocationFound = useCallback((position) => {
+    // Set as bias location
+    setBiasLocation(position)
+    setBiasType('user')
     
-    // Add dropped pin marker
-    const newMarker = {
-      id: `dropped-${Date.now()}`,
-      position: [lat, lng],
-      name: 'Dropped Pin',
-      type: 'dropped'
-    }
-    setMarkers(prev => [...prev.filter(m => m.type !== 'dropped'), newMarker])
+    // Fly to location
+    flyTo(position, 16)
+  }, [flyTo])
+
+  // Handle map click - drop a pin
+  const handleMapClick = useCallback(async (latlng) => {
+    if (isAnimating) return
+    
+    const { lat, lng } = latlng
+    const position = [lat, lng]
+    
+    // Set as new bias location (replaces user location)
+    setBiasLocation(position)
+    setBiasType('dropped')
     
     // Reverse geocode to get address info
     try {
@@ -288,17 +256,7 @@ function App() {
         lat,
         lon: lng
       })
-      
-      // Update marker with actual name
-      if (data.name || data.display_name) {
-        setMarkers(prev => prev.map(m => 
-          m.id === newMarker.id 
-            ? { ...m, name: data.name || data.display_name?.split(',')[0] || 'Dropped Pin' }
-            : m
-        ))
-      }
     } catch (error) {
-      // If reverse geocode fails, just show coordinates
       setSelectedPlace({
         name: 'Dropped Pin',
         address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
@@ -307,31 +265,198 @@ function App() {
       })
     }
     
-    // Open sidebar to show place info
     setShowSidebar(true)
+  }, [isAnimating])
+
+  // Ensure we have a bias location (auto-locate if needed)
+  const ensureBiasLocation = useCallback(() => {
+    return new Promise((resolve) => {
+      if (biasLocation) {
+        resolve(biasLocation)
+      } else {
+        // Need to get user location first
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const loc = [pos.coords.latitude, pos.coords.longitude]
+            setBiasLocation(loc)
+            setBiasType('user')
+            flyTo(loc, 15)
+            setTimeout(() => resolve(loc), 1400)
+          },
+          (err) => {
+            console.error('Geolocation error:', err)
+            // Fallback to default location
+            const fallback = [14.4324, 120.9619]
+            setBiasLocation(fallback)
+            setBiasType('user')
+            resolve(fallback)
+          },
+          { enableHighAccuracy: true }
+        )
+      }
+    })
+  }, [biasLocation, flyTo])
+
+  // Search for places
+  const handleSearch = async (e) => {
+    e.preventDefault()
+    if (!searchQuery.trim() || isAnimating) return
+    
+    setActiveFilter(null)
+    setIsSearching(true)
+    setFilterMarkers([])
+    
+    // Ensure we have a bias location
+    const bias = await ensureBiasLocation()
+    const [lat, lon] = bias
+    
+    try {
+      // Search with tight local bias first (~5km radius = 0.045 degrees)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=20&viewbox=${lon-0.045},${lat+0.045},${lon+0.045},${lat-0.045}&bounded=1`
+      )
+      let data = await response.json()
+      
+      // If no local results, widen to ~15km
+      if (data.length === 0) {
+        const widerResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=20&viewbox=${lon-0.15},${lat+0.15},${lon+0.15},${lat-0.15}&bounded=1`
+        )
+        data = await widerResponse.json()
+      }
+      
+      // If still no results, search Philippines-wide
+      if (data.length === 0) {
+        const fallbackResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=20&countrycodes=ph`
+        )
+        data = await fallbackResponse.json()
+      }
+      
+      // Calculate actual distance and sort by it
+      data = data.map(item => ({
+        ...item,
+        distance: getDistanceKm(lat, lon, parseFloat(item.lat), parseFloat(item.lon))
+      }))
+      data.sort((a, b) => a.distance - b.distance)
+      
+      setSearchResults(data.slice(0, 6))
+      setShowSidebar(true)
+      
+    } catch (error) {
+      console.error('Search failed:', error)
+    }
+    setIsSearching(false)
   }
 
-  // Handle location found
-  const handleLocationFound = (latlng) => {
-    setUserLocation([latlng.lat, latlng.lng])
-    setMapCenter([latlng.lat, latlng.lng])
+  // Filter by category
+  const handleCategoryFilter = async (category) => {
+    if (isAnimating) return
+    
+    if (activeFilter === category.id) {
+      setActiveFilter(null)
+      setSearchResults([])
+      setFilterMarkers([])
+      return
+    }
+    
+    setActiveFilter(category.id)
+    setSearchQuery('')
+    setIsSearching(true)
+    setSearchMarker(null)
+    
+    // Ensure we have a bias location
+    const bias = await ensureBiasLocation()
+    const [lat, lon] = bias
+    
+    try {
+      // Search tight radius first (~3km)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=30&viewbox=${lon-0.03},${lat+0.03},${lon+0.03},${lat-0.03}&bounded=1`
+      )
+      let data = await response.json()
+      
+      // If not enough results, widen to ~8km
+      if (data.length < 5) {
+        const widerResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=30&viewbox=${lon-0.08},${lat+0.08},${lon+0.08},${lat-0.08}&bounded=1`
+        )
+        const widerData = await widerResponse.json()
+        // Merge and deduplicate by place_id
+        const existingIds = new Set(data.map(d => d.place_id))
+        widerData.forEach(item => {
+          if (!existingIds.has(item.place_id)) data.push(item)
+        })
+      }
+      
+      // Calculate actual distance and sort
+      data = data.map(item => ({
+        ...item,
+        distance: getDistanceKm(lat, lon, parseFloat(item.lat), parseFloat(item.lon))
+      }))
+      data.sort((a, b) => a.distance - b.distance)
+      
+      data = data.slice(0, 8)
+      setSearchResults(data)
+      
+      // Create filter markers
+      const markers = data.map((result, index) => ({
+        id: `filter-${index}`,
+        position: [parseFloat(result.lat), parseFloat(result.lon)],
+        name: result.display_name.split(',')[0]
+      }))
+      setFilterMarkers(markers)
+      setShowSidebar(true)
+      
+    } catch (error) {
+      console.error('Filter search failed:', error)
+    }
+    setIsSearching(false)
   }
 
-  // Clear all markers
-  const clearMarkers = () => {
-    setMarkers([])
+  // Handle clicking on a search result
+  const handleResultClick = (result) => {
+    if (isAnimating) return
+    
+    const lat = parseFloat(result.lat)
+    const lon = parseFloat(result.lon)
+    
+    setSelectedPlace({
+      name: result.display_name.split(',')[0],
+      address: result.display_name,
+      lat,
+      lon
+    })
+    
+    setSearchMarker({
+      position: [lat, lon],
+      name: result.display_name.split(',')[0]
+    })
+    
+    // Fly to location with animation
+    flyTo([lat, lon], 17)
+  }
+
+  // Clear all markers and results
+  const clearAll = () => {
+    setFilterMarkers([])
+    setSearchMarker(null)
     setSelectedPlace(null)
-    setActiveFilter(null) // Also clear active filter
-    setSearchResults([]) // Clear search results
+    setActiveFilter(null)
+    setSearchResults([])
+    // Keep bias location
   }
 
   return (
-    <div className="app">
-      {/* HEADER - Search Bar (INSTRUCTING interaction) */}
+    <div className={`app ${isAnimating ? 'animating' : ''}`}>
+      {/* Loading overlay when animating */}
+      {isAnimating && <div className="animation-overlay" />}
+      
+      {/* HEADER */}
       <header className="header">
         <button 
           className="menu-btn"
-          onClick={() => setShowSidebar(!showSidebar)}
+          onClick={() => !isAnimating && setShowSidebar(!showSidebar)}
           aria-label="Menu"
         >
           <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
@@ -347,17 +472,16 @@ function App() {
           <span>LiteMap</span>
         </div>
 
-        {/* Search Form - INSTRUCTING */}
         <form className="search-form" onSubmit={handleSearch}>
           <input
-            ref={searchInputRef}
             type="text"
             placeholder="Search places..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={isAnimating}
             aria-label="Search for a place"
           />
-          <button type="submit" disabled={isSearching} aria-label="Search">
+          <button type="submit" disabled={isSearching || isAnimating} aria-label="Search">
             {isSearching ? (
               <span className="spinner"></span>
             ) : (
@@ -370,16 +494,15 @@ function App() {
       </header>
 
       <main className="main">
-        {/* Sidebar Overlay - tap to close */}
+        {/* Sidebar Overlay */}
         {showSidebar && (
           <div 
             className="sidebar-overlay" 
             onClick={() => setShowSidebar(false)}
-            aria-hidden="true"
           />
         )}
 
-        {/* SIDEBAR - Results & Info (INSTRUCTING) */}
+        {/* SIDEBAR */}
         <aside className={`sidebar ${showSidebar ? 'open' : ''}`}>
           <div className="sidebar-header">
             <h2>
@@ -387,20 +510,21 @@ function App() {
                 ? (activeFilter 
                     ? `${categories.find(c => c.id === activeFilter)?.label || 'Results'} Nearby`
                     : 'Search Results')
-                : 'LiteMap'}
+                : selectedPlace 
+                    ? 'Location Info'
+                    : 'LiteMap'}
             </h2>
             <button 
               className="sidebar-close"
               onClick={() => setShowSidebar(false)}
-              aria-label="Close sidebar"
             >
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
           </div>
+          
           <div className="sidebar-content">
-            
             {/* Search Results */}
             {searchResults.length > 0 ? (
               <ul className="results-list">
@@ -409,6 +533,7 @@ function App() {
                     <button 
                       className="result-item"
                       onClick={() => handleResultClick(result)}
+                      disabled={isAnimating}
                     >
                       <div className="result-icon">
                         <svg viewBox="0 0 24 24" width="24" height="24" fill="#ea4335">
@@ -419,23 +544,14 @@ function App() {
                         <strong>{result.display_name.split(',')[0]}</strong>
                         <small>{result.display_name.split(',').slice(1, 3).join(',')}</small>
                       </div>
+                      {result.distance !== undefined && (
+                        <span className="result-distance">{formatDistance(result.distance)}</span>
+                      )}
                     </button>
                   </li>
                 ))}
               </ul>
-            ) : (
-              <div className="sidebar-empty">
-                <div className="empty-icon">
-                  <svg viewBox="0 0 24 24" width="64" height="64" fill="#dadce0">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                  </svg>
-                </div>
-                <p>Search for a place</p>
-              </div>
-            )}
-
-            {/* Selected Place Info - Bottom Sheet */}
-            {selectedPlace && (
+            ) : selectedPlace ? (
               <div className="place-card">
                 <h3>{selectedPlace.name}</h3>
                 <p>{selectedPlace.address}</p>
@@ -445,86 +561,135 @@ function App() {
                   </button>
                   <button onClick={() => {
                     navigator.clipboard.writeText(`${selectedPlace.lat}, ${selectedPlace.lon}`)
+                    alert('Coordinates copied!')
                   }}>
                     Share
                   </button>
                 </div>
               </div>
+            ) : (
+              <div className="sidebar-empty">
+                <div className="empty-icon">
+                  <svg viewBox="0 0 24 24" width="64" height="64" fill="#dadce0">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  </svg>
+                </div>
+                <p>Search for a place or tap the map</p>
+              </div>
             )}
 
             {/* Quick Actions */}
-            {markers.length > 0 && (
+            {(filterMarkers.length > 0 || searchMarker || selectedPlace) && (
               <div className="quick-actions">
-                <button className="clear-btn" onClick={clearMarkers}>
-                  Clear All Pins
+                <button className="clear-btn" onClick={clearAll}>
+                  Clear All
                 </button>
               </div>
             )}
           </div>
         </aside>
 
-        {/* MAP - Main interaction area (MANIPULATING) */}
+        {/* MAP */}
         <div className="map-wrapper">
           <MapContainer
             center={mapCenter}
-            zoom={mapZoom}
+            zoom={13}
             className="map"
             zoomControl={false}
             attributionControl={false}
           >
-            {/* Map tiles - Clean without attribution */}
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            
+            {/* Grab map instance for external controls */}
+            <MapInstanceGrabber onMapReady={handleMapReady} />
+            
+            {/* Handle map clicks - only on map tiles */}
+            <MapClickHandler onMapClick={handleMapClick} disabled={isAnimating} />
+            
+            {/* Handle geolocation */}
+            <GeolocateHandler 
+              trigger={geoTrigger} 
+              onLocated={handleLocationFound}
+              onError={(msg) => {
+                alert('Could not find your location: ' + msg)
+                setIsAnimating(false)
+              }}
             />
             
-            {/* Map controller for events */}
-            <MapController 
-              center={null}
-              zoom={mapZoom}
-              onMapClick={handleMapClick}
-              onLocationFound={handleLocationFound}
-              onMapMove={setCurrentViewCenter}
-            />
+            {/* Fly to animation handler */}
+            <FlyToHandler flyTarget={flyTarget} onComplete={handleFlyComplete} />
             
-            {/* Custom zoom controls */}
-            <ZoomControls />
-            
-            {/* Locate button */}
-            <LocateButton onLocate={() => {}} />
-            
-            {/* User location marker */}
-            {userLocation && (
-              <Marker position={userLocation} icon={blueIcon}>
-                <Popup>📍 You are here</Popup>
+            {/* Bias location marker - Blue for user, Orange for dropped */}
+            {biasLocation && (
+              <Marker 
+                position={biasLocation} 
+                icon={biasType === 'user' ? blueIcon : orangeIcon}
+              >
+                <Popup>
+                  <strong>{biasType === 'user' ? '📍 You are here' : '📌 Dropped Pin'}</strong>
+                </Popup>
               </Marker>
             )}
             
-            {/* Custom markers */}
-            {markers.map(marker => (
+            {/* Search result marker */}
+            {searchMarker && (
+              <Marker position={searchMarker.position} icon={redIcon}>
+                <Popup>
+                  <strong>{searchMarker.name}</strong>
+                </Popup>
+              </Marker>
+            )}
+            
+            {/* Filter markers */}
+            {filterMarkers.map(marker => (
               <Marker 
                 key={marker.id} 
                 position={marker.position}
-                icon={marker.type === 'search' ? redIcon : marker.type === 'dropped' ? orangeIcon : greenIcon}
+                icon={greenIcon}
               >
                 <Popup>
                   <strong>{marker.name}</strong>
-                  <br />
-                  <small>{marker.position[0].toFixed(4)}, {marker.position[1].toFixed(4)}</small>
                 </Popup>
               </Marker>
             ))}
           </MapContainer>
 
-          {/* Category Filters - INSTRUCTING */}
+          {/* Zoom Controls - Outside of Leaflet */}
+          <div className="zoom-controls">
+            <button 
+              onClick={handleZoomIn}
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+            <button 
+              onClick={handleZoomOut}
+              aria-label="Zoom out"
+            >
+              −
+            </button>
+          </div>
+
+          {/* Locate Button - Outside of Leaflet */}
+          <button 
+            className="locate-btn"
+            onClick={handleLocateMe}
+            disabled={isAnimating}
+            aria-label="Find my location"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+            </svg>
+          </button>
+
+          {/* Category Filters */}
           <div className={`category-filters-wrapper ${showSidebar ? 'sidebar-open' : ''}`}>
             <button 
               className="scroll-arrow scroll-left"
               onClick={(e) => {
-                e.stopPropagation()
-                const container = e.target.closest('.category-filters-wrapper').querySelector('.category-filters')
+                const container = e.currentTarget.closest('.category-filters-wrapper').querySelector('.category-filters')
                 container.scrollBy({ left: -150, behavior: 'smooth' })
               }}
-              aria-label="Scroll left"
             >
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
@@ -536,7 +701,7 @@ function App() {
                   key={cat.id}
                   className={`category-chip ${activeFilter === cat.id ? 'active' : ''}`}
                   onClick={() => handleCategoryFilter(cat)}
-                  aria-label={`Find ${cat.label}`}
+                  disabled={isAnimating}
                 >
                   <span className="chip-icon">{cat.icon}</span>
                   <span className="chip-label">{cat.label}</span>
@@ -546,11 +711,9 @@ function App() {
             <button 
               className="scroll-arrow scroll-right"
               onClick={(e) => {
-                e.stopPropagation()
-                const container = e.target.closest('.category-filters-wrapper').querySelector('.category-filters')
+                const container = e.currentTarget.closest('.category-filters-wrapper').querySelector('.category-filters')
                 container.scrollBy({ left: 150, behavior: 'smooth' })
               }}
-              aria-label="Scroll right"
             >
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
