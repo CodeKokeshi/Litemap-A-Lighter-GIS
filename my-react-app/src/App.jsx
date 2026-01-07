@@ -625,8 +625,8 @@ function App() {
   const nextTutorialStep = useCallback(() => {
     if (tutorialStep < tutorialSteps.length) {
       setTutorialStep(tutorialStep + 1)
-      // Open sidebar for step 5
-      if (tutorialStep + 1 === 5) {
+      // Open sidebar for step 6 (sidebar results)
+      if (tutorialStep + 1 === 6) {
         setShowSidebar(true)
       }
     } else {
@@ -677,7 +677,14 @@ function App() {
       <header className="header">
         <button 
           className="menu-btn"
-          onClick={() => !isAnimating && setShowSidebar(!showSidebar)}
+          onClick={() => {
+            if (isAnimating) return
+            // If closing sidebar during step 6, end tutorial
+            if (showSidebar && tutorialStep === 6) {
+              setTutorialStep(null)
+            }
+            setShowSidebar(!showSidebar)
+          }}
           aria-label="Menu"
         >
           <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">

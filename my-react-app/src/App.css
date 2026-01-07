@@ -1028,20 +1028,20 @@ html, body, #root {
 
 /* Step 1: Locate button - bottom right */
 .tutorial-spotlight.locate-btn {
-  bottom: 76px;
-  right: 10px;
-  width: 48px;
-  height: 48px;
+  bottom: 72px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
 }
 
 /* Step 2: Zoom controls */
 .tutorial-spotlight.zoom-controls {
-  bottom: 130px;
-  right: 10px;
-  width: 38px;
-  height: 78px;
-  border-radius: 8px;
+  bottom: 124px;
+  right: 8px;
+  width: 36px;
+  height: 82px;
+  border-radius: 4px;
 }
 
 /* Step 3: Map area - center of screen */
