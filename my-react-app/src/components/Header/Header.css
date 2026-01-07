@@ -1,0 +1,207 @@
+/**
+ * Header Component Styles
+ * 
+ * DESIGN DECISIONS:
+ * - Fixed height header for consistency
+ * - Shadow to separate from content below
+ * - Search bar is prominent (primary action)
+ * - Actions are grouped and easily accessible
+ */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-dropdown);
+  height: 64px;
+  position: relative;
+}
+
+/* Menu Button */
+.header-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.header-menu-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Brand/Logo */
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+/* Search Bar */
+.header-search {
+  flex: 1;
+  max-width: 720px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  border: 1px solid transparent;
+  transition: background var(--transition-fast), 
+              border-color var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+.header-search:hover {
+  background: var(--bg-tertiary);
+}
+
+.header-search.focused {
+  background: var(--bg-secondary);
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-md);
+}
+
+.search-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  padding: var(--space-xs);
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  min-width: 0;
+}
+
+.search-input::placeholder {
+  color: var(--text-light);
+}
+
+.search-clear-btn,
+.search-voice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.search-clear-btn:hover,
+.search-voice-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.header-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.header-action-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.header-profile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--space-sm);
+}
+
+.profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--primary-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast);
+}
+
+.header-profile-btn:hover .profile-avatar {
+  transform: scale(1.05);
+}
+
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Tablet */
+@media screen and (max-width: 1024px) {
+  .header-title {
+    display: none;
+  }
+}
+
+/* Mobile */
+@media screen and (max-width: 768px) {
+  .header {
+    padding: var(--space-sm);
+    height: 56px;
+    gap: var(--space-sm);
+  }
+
+  .header-search {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .search-input {
+    font-size: var(--font-size-md);
+  }
+
+  .header-action-btn:not(:first-child) {
+    display: none;
+  }
+}
+
+/* Small Mobile */
+@media screen and (max-width: 480px) {
+  .search-voice-btn {
+    display: none;
+  }
+}
