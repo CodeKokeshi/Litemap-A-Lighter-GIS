@@ -465,22 +465,6 @@ html, body, #root {
   background: var(--bg);
   color: var(--primary);
 }
-  border: none;
-  background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.locate-btn:active {
-  background: var(--bg);
-  color: var(--primary);
-}
 
 /* Map Type Selector - Bottom Left */
 .map-type-selector {
