@@ -32,26 +32,32 @@ A clean, responsive mapping application built as an HCI (Human-Computer Interact
 1. **Clone or download the repository**
    ```bash
    git clone <repository-url>
+   cd HCI-Finals
+   ```
+
+2. **Navigate to the React app directory**
+   ```bash
    cd my-react-app
    ```
 
-2. **Install dependencies**
+3. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. **Start the development server**
+4. **Start the development server**
    ```bash
    npm run dev
    ```
 
-4. **Open in browser**
+5. **Open in browser**
    
    Navigate to `http://localhost:5173` (or the URL shown in terminal)
 
 ### Build for Production
 
 ```bash
+cd my-react-app
 npm run build
 ```
 
@@ -92,19 +98,23 @@ Tap the **?** button anytime for an interactive tutorial walkthrough.
 ## 📁 Project Structure
 
 ```
-my-react-app/
-├── src/
-│   ├── App.jsx        # Main application component
-│   ├── App.css        # Application styles (mobile-first)
-│   ├── main.jsx       # Entry point
-│   └── index.css      # Global styles & CSS variables
-├── public/            # Static assets
-├── index.html         # HTML template
-├── package.json       # Dependencies
-└── vite.config.js     # Vite configuration
+HCI-Finals/
+├── my-react-app/
+│   ├── src/
+│   │   ├── App.jsx        # Main application component
+│   │   ├── App.css        # Application styles (mobile-first)
+│   │   ├── main.jsx       # Entry point
+│   │   └── index.css      # Global styles & CSS variables
+│   ├── public/            # Static assets
+│   ├── index.html         # HTML template
+│   ├── package.json       # Dependencies
+│   └── vite.config.js     # Vite configuration
+└── README.md              # This file
 ```
 
 ## 📜 Available Scripts
+
+Run these commands from the `my-react-app` directory:
 
 | Command | Description |
 |---------|-------------|
@@ -128,7 +138,7 @@ my-react-app/
 
 ## 📝 Documentation
 
-See [DESIGN_DOCUMENTATION.md](./DESIGN_DOCUMENTATION.md) for complete design decisions and interaction patterns.
+See [my-react-app/DESIGN_DOCUMENTATION.md](./my-react-app/DESIGN_DOCUMENTATION.md) for complete design decisions and interaction patterns.
 
 ## 📄 License
 
