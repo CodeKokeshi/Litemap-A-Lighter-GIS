@@ -284,9 +284,18 @@ function App() {
       </header>
 
       <main className="main">
+        {/* Sidebar Overlay - tap to close */}
+        {showSidebar && (
+          <div 
+            className="sidebar-overlay" 
+            onClick={() => setShowSidebar(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* SIDEBAR - Results & Info (INSTRUCTING) */}
         <aside className={`sidebar ${showSidebar ? 'open' : ''}`}>
-          <div className="sidebar-content">
+          <div className="sidebar-header">
             <h2>
               {searchResults.length > 0 
                 ? (activeFilter 
@@ -294,6 +303,17 @@ function App() {
                     : 'Search Results')
                 : 'LiteMap'}
             </h2>
+            <button 
+              className="sidebar-close"
+              onClick={() => setShowSidebar(false)}
+              aria-label="Close sidebar"
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            </button>
+          </div>
+          <div className="sidebar-content">
             
             {/* Search Results */}
             {searchResults.length > 0 ? (
@@ -364,10 +384,10 @@ function App() {
             zoom={mapZoom}
             className="map"
             zoomControl={false}
+            attributionControl={false}
           >
-            {/* Map tiles from OpenStreetMap */}
+            {/* Map tiles - Clean without attribution */}
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             
@@ -407,6 +427,11 @@ function App() {
               </Marker>
             ))}
           </MapContainer>
+
+          {/* Custom LiteMap attribution */}
+          <div className="map-attribution">
+            LiteMap • HCI Finals
+          </div>
 
           {/* Category Filters - INSTRUCTING */}
           <div className={`category-filters-wrapper ${showSidebar ? 'sidebar-open' : ''}`}>

@@ -48,10 +48,10 @@ html, body, #root {
 .header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 8px 12px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   z-index: 1000;
   height: 56px;
   flex-shrink: 0;
@@ -60,7 +60,10 @@ html, body, #root {
 .menu-btn {
   background: none;
   border: none;
-  padding: 10px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
   border-radius: var(--radius-full);
   cursor: pointer;
   color: var(--text-secondary);
@@ -68,10 +71,12 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
 }
 
 .menu-btn:active {
   background: var(--bg);
+  color: var(--primary);
 }
 
 .brand {
@@ -95,14 +100,15 @@ html, body, #root {
   border-radius: var(--radius-full);
   overflow: hidden;
   border: 2px solid transparent;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   height: 44px;
+  min-width: 0;
 }
 
 .search-form:focus-within {
   background: var(--surface);
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.12);
 }
 
 .search-form input {
@@ -113,10 +119,12 @@ html, body, #root {
   font-size: 16px; /* Prevents iOS zoom */
   outline: none;
   min-width: 0;
+  color: var(--text);
 }
 
 .search-form input::placeholder {
   color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 .search-form button {
@@ -128,6 +136,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s;
 }
 
 .search-form button:active {
@@ -156,11 +165,23 @@ html, body, #root {
 }
 
 /* ========== SIDEBAR - Mobile Drawer ========== */
+.sidebar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 550;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
 .sidebar {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  width: 85%;
   max-width: 320px;
   height: 100%;
   background: var(--surface);
@@ -177,22 +198,49 @@ html, body, #root {
   transform: translateX(0);
 }
 
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.sidebar-header h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sidebar-close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.sidebar-close:active {
+  background: var(--bg);
+}
+
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-}
-
-.sidebar h2 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  z-index: 1;
+  overscroll-behavior: contain;
 }
 
 /* Empty State */
@@ -356,9 +404,9 @@ html, body, #root {
 /* Zoom Controls - Mobile Positioned */
 .zoom-controls {
   position: absolute;
-  bottom: 160px;
+  bottom: 140px;
   right: 12px;
-  z-index: 1000;
+  z-index: 500;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -372,7 +420,7 @@ html, body, #root {
   height: 44px;
   border: none;
   background: var(--surface);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 300;
   cursor: pointer;
   color: var(--text-secondary);
@@ -380,10 +428,12 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s;
 }
 
 .zoom-controls button:active {
   background: var(--bg);
+  color: var(--primary);
 }
 
 .zoom-controls button:first-child {
@@ -393,11 +443,28 @@ html, body, #root {
 /* Locate Button */
 .locate-btn {
   position: absolute;
-  bottom: 100px;
+  bottom: 80px;
   right: 12px;
-  z-index: 1000;
+  z-index: 500;
   width: 44px;
   height: 44px;
+  border: none;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.locate-btn:active {
+  background: var(--bg);
+  color: var(--primary);
+}
   border: none;
   background: var(--surface);
   border-radius: var(--radius);
@@ -451,26 +518,27 @@ html, body, #root {
 /* ========== CATEGORY FILTERS - INSTRUCTING ========== */
 .category-filters-wrapper {
   position: absolute;
-  bottom: 24px;
+  bottom: 20px;
   left: 12px;
-  right: 70px;
+  right: 64px;
   z-index: 400;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  transition: opacity 0.2s ease;
 }
 
 /* Hide filters when sidebar is open on mobile */
 .category-filters-wrapper.sidebar-open {
   z-index: 100;
   pointer-events: none;
-  opacity: 0.3;
+  opacity: 0;
 }
 
 .scroll-arrow {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
   background: var(--surface);
   border-radius: var(--radius-full);
@@ -482,6 +550,7 @@ html, body, #root {
   color: var(--text-secondary);
   -webkit-tap-highlight-color: transparent;
   z-index: 2;
+  transition: background 0.15s, color 0.15s;
 }
 
 .scroll-arrow:active {
@@ -498,9 +567,10 @@ html, body, #root {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 4px 0;
+  padding: 4px 2px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  scroll-behavior: smooth;
 }
 
 .category-filters::-webkit-scrollbar {
@@ -511,29 +581,29 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   background: var(--surface);
   border: none;
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
   font-size: 13px;
   font-weight: 500;
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.15s;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
 
 .category-chip:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .category-chip.active {
   background: var(--primary);
   color: white;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 3px 10px rgba(66, 133, 244, 0.35);
 }
 
 .chip-icon {
@@ -550,9 +620,9 @@ html, body, #root {
   font-family: inherit;
 }
 
+/* Hide Leaflet attribution */
 .leaflet-control-attribution {
-  font-size: 10px;
-  background: rgba(255,255,255,0.8) !important;
+  display: none !important;
 }
 
 .leaflet-popup-content-wrapper {
@@ -580,6 +650,22 @@ html, body, #root {
   display: none !important;
 }
 
+/* Custom LiteMap Attribution */
+.map-attribution {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 450;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
 /* ========== TABLET & DESKTOP ========== */
 @media (min-width: 768px) {
   .brand span {
@@ -590,11 +676,16 @@ html, body, #root {
     max-width: 480px;
   }
 
+  /* Hide overlay on desktop */
+  .sidebar-overlay {
+    display: none;
+  }
+
   .sidebar {
     position: relative;
+    width: 360px;
     max-width: 360px;
     transform: translateX(-100%);
-    width: 360px;
   }
 
   .sidebar.open {
@@ -604,6 +695,15 @@ html, body, #root {
   .sidebar:not(.open) {
     width: 0;
     min-width: 0;
+  }
+
+  /* Hide close button on desktop */
+  .sidebar-close {
+    display: none;
+  }
+
+  .sidebar-header {
+    padding: 16px;
   }
 
   .zoom-controls {
@@ -643,6 +743,11 @@ html, body, #root {
   /* Hide scroll arrows on larger screens (more room) */
   .scroll-arrow {
     display: none;
+  }
+
+  .map-attribution {
+    bottom: 12px;
+    right: 12px;
   }
 }
 
