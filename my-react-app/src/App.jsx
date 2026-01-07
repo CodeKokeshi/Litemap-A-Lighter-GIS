@@ -188,6 +188,53 @@ function App() {
   // Route/directions state
   const [routeInfo, setRouteInfo] = useState(null)
   
+  // Tutorial state
+  const [tutorialStep, setTutorialStep] = useState(null)
+  const tutorialSteps = [
+    {
+      id: 1,
+      target: 'locate-btn',
+      title: 'Find Your Location',
+      description: 'Tap this button to find where you are. This sets your starting point for searches and directions.',
+      position: 'left'
+    },
+    {
+      id: 2,
+      target: 'map-area',
+      title: 'Drop a Pin',
+      description: 'Tap anywhere on the map to drop a pin. This becomes your new reference point for nearby searches.',
+      position: 'center'
+    },
+    {
+      id: 3,
+      target: 'search-form',
+      title: 'Search Places',
+      description: 'Type any place name to search. Results show the nearest locations to your pin or location.',
+      position: 'bottom'
+    },
+    {
+      id: 4,
+      target: 'category-filters',
+      title: 'Quick Filters',
+      description: 'Tap these buttons to find nearby churches, restaurants, gas stations, and more!',
+      position: 'top'
+    },
+    {
+      id: 5,
+      target: 'sidebar-area',
+      title: 'View Results',
+      description: 'Tap any result to see options: Locate (go there), Route (get directions), or Share (copy location).',
+      position: 'right'
+    },
+    {
+      id: 6,
+      target: 'zoom-controls',
+      title: 'Zoom Controls',
+      description: 'Use + and − to zoom in and out of the map.',
+      position: 'left'
+    }
+  ]
+  
   // Map instance ref (not MapContainer, actual Leaflet map)
   const mapInstanceRef = useRef(null)
   
@@ -563,10 +610,74 @@ function App() {
     // Keep bias location
   }
 
+  // Start tutorial
+  const startTutorial = useCallback(() => {
+    // Reset everything first
+    setShowSidebar(false)
+    setFilterMarkers([])
+    setSearchMarker(null)
+    setSelectedPlace(null)
+    setActiveFilter(null)
+    setSearchResults([])
+    setRouteInfo(null)
+    setBiasLocation(null)
+    setBiasType(null)
+    setSearchQuery('')
+    
+    // Start at step 1
+    setTutorialStep(1)
+  }, [])
+
+  const nextTutorialStep = useCallback(() => {
+    if (tutorialStep < tutorialSteps.length) {
+      setTutorialStep(tutorialStep + 1)
+      // Open sidebar for step 5
+      if (tutorialStep + 1 === 5) {
+        setShowSidebar(true)
+      }
+    } else {
+      setTutorialStep(null)
+      showToast('🎉 You\'re all set!')
+    }
+  }, [tutorialStep, tutorialSteps.length, showToast])
+
+  const skipTutorial = useCallback(() => {
+    setTutorialStep(null)
+  }, [])
+
+  const currentTutorial = tutorialStep ? tutorialSteps.find(s => s.id === tutorialStep) : null
+
   return (
     <div className={`app ${isAnimating ? 'animating' : ''}`}>
       {/* Loading overlay when animating */}
       {isAnimating && <div className="animation-overlay" />}
+      
+      {/* Tutorial Overlay */}
+      {currentTutorial && (
+        <div className="tutorial-overlay">
+          <div className={`tutorial-spotlight ${currentTutorial.target}`} />
+          <div className={`tutorial-tooltip ${currentTutorial.position}`} data-target={currentTutorial.target}>
+            <div className="tutorial-step">Step {tutorialStep} of {tutorialSteps.length}</div>
+            <h3>{currentTutorial.title}</h3>
+            <p>{currentTutorial.description}</p>
+            <div className="tutorial-actions">
+              <button className="tutorial-skip" onClick={skipTutorial}>Skip</button>
+              <button className="tutorial-next" onClick={nextTutorialStep}>
+                {tutorialStep === tutorialSteps.length ? 'Done' : 'Next'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Help Button */}
+      <button 
+        className="help-btn"
+        onClick={startTutorial}
+        aria-label="Help / Tutorial"
+      >
+        ?
+      </button>
       
       {/* HEADER */}
       <header className="header">
