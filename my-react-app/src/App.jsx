@@ -35,6 +35,7 @@ const createIcon = (color) => new L.Icon({
 const redIcon = createIcon('red')
 const blueIcon = createIcon('blue')
 const greenIcon = createIcon('green')
+const orangeIcon = createIcon('orange')
 
 // Component to handle map events and controls
 function MapController({ center, zoom, onMapClick, onLocationFound, onMapMove }) {
@@ -68,15 +69,15 @@ function ZoomControls() {
   const map = useMap()
   
   return (
-    <div className="zoom-controls">
+    <div className="zoom-controls" onClick={(e) => e.stopPropagation()}>
       <button 
-        onClick={() => map.zoomIn()} 
+        onClick={(e) => { e.stopPropagation(); map.zoomIn(); }} 
         aria-label="Zoom in"
       >
         +
       </button>
       <button 
-        onClick={() => map.zoomOut()} 
+        onClick={(e) => { e.stopPropagation(); map.zoomOut(); }} 
         aria-label="Zoom out"
       >
         −
@@ -89,7 +90,8 @@ function ZoomControls() {
 function LocateButton({ onLocate }) {
   const map = useMap()
   
-  const handleLocate = () => {
+  const handleLocate = (e) => {
+    e.stopPropagation()
     map.locate({ setView: false })
     onLocate()
   }
@@ -145,20 +147,37 @@ function App() {
     setActiveFilter(null) // Clear filter when searching
     setIsSearching(true)
     try {
-      // Bias search towards current map view
+      // Search with strong local bias using current view center
       const [lat, lon] = currentViewCenter
+      // Use bounded=1 to strictly limit to viewbox area
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&viewbox=${lon-0.5},${lat+0.5},${lon+0.5},${lat-0.5}&bounded=0`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=10&viewbox=${lon-0.15},${lat+0.15},${lon+0.15},${lat-0.15}&bounded=1`
       )
-      const data = await response.json()
-      setSearchResults(data)
+      let data = await response.json()
+      
+      // If no local results, try a wider search with country bias
+      if (data.length === 0) {
+        const fallbackResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=10&countrycodes=ph&viewbox=${lon-1},${lat+1},${lon+1},${lat-1}`
+        )
+        data = await fallbackResponse.json()
+      }
+      
+      // Sort results by distance from current view
+      data.sort((a, b) => {
+        const distA = Math.sqrt(Math.pow(parseFloat(a.lat) - lat, 2) + Math.pow(parseFloat(a.lon) - lon, 2))
+        const distB = Math.sqrt(Math.pow(parseFloat(b.lat) - lat, 2) + Math.pow(parseFloat(b.lon) - lon, 2))
+        return distA - distB
+      })
+      
+      setSearchResults(data.slice(0, 5))
       setShowSidebar(true)
       
       // If results found, zoom to first result
       if (data.length > 0) {
         const first = data[0]
         setMapCenter([parseFloat(first.lat), parseFloat(first.lon)])
-        setMapZoom(15)
+        setMapZoom(16)
       }
     } catch (error) {
       console.error('Search failed:', error)
@@ -181,12 +200,21 @@ function App() {
     setIsSearching(true)
     
     try {
-      // Search near CURRENT map view (not initial center)
+      // Search near CURRENT map view with larger radius
       const [lat, lon] = currentViewCenter
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=10&viewbox=${lon-0.1},${lat+0.1},${lon+0.1},${lat-0.1}&bounded=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=15&viewbox=${lon-0.2},${lat+0.2},${lon+0.2},${lat-0.2}&bounded=1`
       )
-      const data = await response.json()
+      let data = await response.json()
+      
+      // Sort by distance from current view
+      data.sort((a, b) => {
+        const distA = Math.sqrt(Math.pow(parseFloat(a.lat) - lat, 2) + Math.pow(parseFloat(a.lon) - lon, 2))
+        const distB = Math.sqrt(Math.pow(parseFloat(b.lat) - lat, 2) + Math.pow(parseFloat(b.lon) - lon, 2))
+        return distA - distB
+      })
+      
+      data = data.slice(0, 8)
       setSearchResults(data)
       
       // Auto-drop pins for filter results on the map
@@ -199,19 +227,26 @@ function App() {
       // Replace old filter markers with new ones
       setMarkers(prev => [...prev.filter(m => m.type !== 'filter'), ...filterMarkers])
       
-      // Don't auto-open sidebar - let user choose via hamburger
     } catch (error) {
       console.error('Filter search failed:', error)
     }
     setIsSearching(false)
   }
 
-  // Handle clicking on a search result
+  // Handle clicking on a search result - fly to location with animation
   const handleResultClick = (result) => {
     const lat = parseFloat(result.lat)
     const lon = parseFloat(result.lon)
-    setMapCenter([lat, lon])
-    setMapZoom(16)
+    
+    // Close sidebar first to see the animation
+    setShowSidebar(false)
+    
+    // Small delay then fly to location
+    setTimeout(() => {
+      setMapCenter([lat, lon])
+      setMapZoom(17)
+    }, 150)
+    
     setSelectedPlace({
       name: result.display_name.split(',')[0],
       address: result.display_name,
@@ -227,10 +262,53 @@ function App() {
     }])
   }
 
-  // Handle map click - close popup/deselect (no more pin dropping)
-  const handleMapClick = (latlng) => {
-    // Just deselect any selected place when clicking empty map area
-    setSelectedPlace(null)
+  // Handle map click - drop a pin and get location info
+  const handleMapClick = async (latlng) => {
+    const { lat, lng } = latlng
+    
+    // Add dropped pin marker
+    const newMarker = {
+      id: `dropped-${Date.now()}`,
+      position: [lat, lng],
+      name: 'Dropped Pin',
+      type: 'dropped'
+    }
+    setMarkers(prev => [...prev.filter(m => m.type !== 'dropped'), newMarker])
+    
+    // Reverse geocode to get address info
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`
+      )
+      const data = await response.json()
+      
+      setSelectedPlace({
+        name: data.name || data.display_name?.split(',')[0] || 'Dropped Pin',
+        address: data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        lat,
+        lon: lng
+      })
+      
+      // Update marker with actual name
+      if (data.name || data.display_name) {
+        setMarkers(prev => prev.map(m => 
+          m.id === newMarker.id 
+            ? { ...m, name: data.name || data.display_name?.split(',')[0] || 'Dropped Pin' }
+            : m
+        ))
+      }
+    } catch (error) {
+      // If reverse geocode fails, just show coordinates
+      setSelectedPlace({
+        name: 'Dropped Pin',
+        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        lat,
+        lon: lng
+      })
+    }
+    
+    // Open sidebar to show place info
+    setShowSidebar(true)
   }
 
   // Handle location found
@@ -262,7 +340,7 @@ function App() {
         </button>
 
         <div className="brand">
-          <svg viewBox="0 0 24 24" width="28" height="28">
+          <svg viewBox="0 0 24 24" width="24" height="24">
             <path fill="#4285f4" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
             <circle fill="#fff" cx="12" cy="9" r="2.5"/>
           </svg>
@@ -426,7 +504,7 @@ function App() {
               <Marker 
                 key={marker.id} 
                 position={marker.position}
-                icon={marker.type === 'search' ? redIcon : greenIcon}
+                icon={marker.type === 'search' ? redIcon : marker.type === 'dropped' ? orangeIcon : greenIcon}
               >
                 <Popup>
                   <strong>{marker.name}</strong>
@@ -436,11 +514,6 @@ function App() {
               </Marker>
             ))}
           </MapContainer>
-
-          {/* Custom LiteMap attribution - above zoom controls */}
-          <div className="map-attribution">
-            LiteMap
-          </div>
 
           {/* Category Filters - INSTRUCTING */}
           <div className={`category-filters-wrapper ${showSidebar ? 'sidebar-open' : ''}`}>
