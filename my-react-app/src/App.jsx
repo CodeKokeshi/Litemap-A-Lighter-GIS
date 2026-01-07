@@ -37,7 +37,7 @@ const blueIcon = createIcon('blue')
 const greenIcon = createIcon('green')
 
 // Component to handle map events and controls
-function MapController({ center, zoom, onMapClick, onLocationFound }) {
+function MapController({ center, zoom, onMapClick, onLocationFound, onMapMove }) {
   const map = useMap()
   
   useMapEvents({
@@ -47,6 +47,11 @@ function MapController({ center, zoom, onMapClick, onLocationFound }) {
     locationfound: (e) => {
       onLocationFound(e.latlng)
       map.flyTo(e.latlng, 15)
+    },
+    moveend: () => {
+      // Track the actual map center when user pans/zooms
+      const center = map.getCenter()
+      onMapMove([center.lat, center.lng])
     }
   })
 
@@ -105,6 +110,7 @@ function LocateButton({ onLocate }) {
 function App() {
   // Map state
   const [mapCenter, setMapCenter] = useState([14.5995, 120.9842]) // Manila, Philippines
+  const [currentViewCenter, setCurrentViewCenter] = useState([14.5995, 120.9842]) // Tracks actual map view
   const [mapZoom, setMapZoom] = useState(13)
   const [markers, setMarkers] = useState([])
   const [userLocation, setUserLocation] = useState(null)
@@ -139,8 +145,10 @@ function App() {
     setActiveFilter(null) // Clear filter when searching
     setIsSearching(true)
     try {
+      // Bias search towards current map view
+      const [lat, lon] = currentViewCenter
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&viewbox=${lon-0.5},${lat+0.5},${lon+0.5},${lat-0.5}&bounded=0`
       )
       const data = await response.json()
       setSearchResults(data)
@@ -173,10 +181,10 @@ function App() {
     setIsSearching(true)
     
     try {
-      // Search near current map center
-      const [lat, lon] = mapCenter
+      // Search near CURRENT map view (not initial center)
+      const [lat, lon] = currentViewCenter
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=5&viewbox=${lon-0.05},${lat+0.05},${lon+0.05},${lat-0.05}&bounded=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${category.id}&limit=10&viewbox=${lon-0.1},${lat+0.1},${lon+0.1},${lat-0.1}&bounded=1`
       )
       const data = await response.json()
       setSearchResults(data)
@@ -397,6 +405,7 @@ function App() {
               zoom={mapZoom}
               onMapClick={handleMapClick}
               onLocationFound={handleLocationFound}
+              onMapMove={setCurrentViewCenter}
             />
             
             {/* Custom zoom controls */}
@@ -428,9 +437,9 @@ function App() {
             ))}
           </MapContainer>
 
-          {/* Custom LiteMap attribution */}
+          {/* Custom LiteMap attribution - above zoom controls */}
           <div className="map-attribution">
-            LiteMap • HCI Finals
+            LiteMap
           </div>
 
           {/* Category Filters - INSTRUCTING */}
