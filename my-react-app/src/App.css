@@ -291,6 +291,10 @@ html, body, #root {
   list-style: none;
 }
 
+.results-list li.selected {
+  background: rgba(66, 133, 244, 0.05);
+}
+
 .result-item {
   width: 100%;
   display: flex;
@@ -306,8 +310,63 @@ html, body, #root {
   -webkit-tap-highlight-color: transparent;
 }
 
+.result-item.active {
+  background: rgba(66, 133, 244, 0.08);
+  border-bottom-color: transparent;
+}
+
 .result-item:active {
   background: var(--bg);
+}
+
+/* Action buttons below selected result */
+.result-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 12px 16px 16px;
+  background: rgba(66, 133, 244, 0.05);
+  border-bottom: 1px solid var(--border);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.result-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.result-actions button:active {
+  transform: scale(0.96);
+}
+
+.result-actions button.btn-primary {
+  background: var(--primary);
+  color: white;
 }
 
 .result-icon {
@@ -391,8 +450,17 @@ html, body, #root {
   cursor: pointer;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
+.place-actions button svg {
+  flex-shrink: 0;
+}
+
+.place-actions button.btn-primary,
 .place-actions button:first-child {
   background: var(--primary);
   color: white;
@@ -400,6 +468,27 @@ html, body, #root {
 
 .place-actions button:active {
   transform: scale(0.98);
+}
+
+/* 3-button layout */
+.place-actions.three-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.place-actions.three-buttons button {
+  flex-direction: column;
+  padding: 12px 8px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.place-distance {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 500;
+  margin-bottom: 12px !important;
 }
 
 /* Quick Actions */
@@ -762,5 +851,121 @@ html, body, #root {
 @media (min-width: 1024px) {
   .search-form {
     max-width: 600px;
+  }
+}
+
+/* ========== TOAST NOTIFICATION ========== */
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: white;
+  padding: 12px 24px;
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  z-index: 10000;
+  animation: toastIn 0.3s ease;
+  white-space: nowrap;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ========== ROUTE PANEL ========== */
+.route-panel {
+  position: fixed;
+  top: 70px;
+  left: 12px;
+  right: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 900;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.route-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.route-icon {
+  width: 44px;
+  height: 44px;
+  background: rgba(66, 133, 244, 0.1);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.route-details strong {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.route-details span {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.route-close {
+  width: 36px;
+  height: 36px;
+  background: var(--bg);
+  border: none;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.route-close:active {
+  background: var(--border);
+}
+
+/* Adjust route panel on desktop */
+@media (min-width: 768px) {
+  .route-panel {
+    left: 340px;
+    right: auto;
+    min-width: 280px;
   }
 }

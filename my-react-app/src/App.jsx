@@ -16,7 +16,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import './App.css'
 
 // Leaflet imports
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -182,6 +182,12 @@ function App() {
   const [showSidebar, setShowSidebar] = useState(false)
   const [selectedPlace, setSelectedPlace] = useState(null)
   
+  // Toast notification
+  const [toast, setToast] = useState(null)
+  
+  // Route/directions state
+  const [routeInfo, setRouteInfo] = useState(null)
+  
   // Map instance ref (not MapContainer, actual Leaflet map)
   const mapInstanceRef = useRef(null)
   
@@ -200,6 +206,12 @@ function App() {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.zoomOut()
     }
+  }, [])
+
+  // Show toast notification
+  const showToast = useCallback((message, duration = 3000) => {
+    setToast(message)
+    setTimeout(() => setToast(null), duration)
   }, [])
 
   // Fly to a location with animation
@@ -232,7 +244,7 @@ function App() {
     flyTo(position, 16)
   }, [flyTo])
 
-  // Handle map click - drop a pin
+  // Handle map click - drop a pin (sets bias location only)
   const handleMapClick = useCallback(async (latlng) => {
     if (isAnimating) return
     
@@ -243,30 +255,21 @@ function App() {
     setBiasLocation(position)
     setBiasType('dropped')
     
-    // Reverse geocode to get address info
+    // Clear any selected place (pins don't show action buttons)
+    setSelectedPlace(null)
+    
+    // Show toast with reverse geocoded name
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`
       )
       const data = await response.json()
-      
-      setSelectedPlace({
-        name: data.name || data.display_name?.split(',')[0] || 'Dropped Pin',
-        address: data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-        lat,
-        lon: lng
-      })
+      const placeName = data.name || data.display_name?.split(',')[0] || 'Pin dropped'
+      showToast(`📌 ${placeName}`)
     } catch (error) {
-      setSelectedPlace({
-        name: 'Dropped Pin',
-        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-        lat,
-        lon: lng
-      })
+      showToast('📌 Pin dropped')
     }
-    
-    setShowSidebar(true)
-  }, [isAnimating])
+  }, [isAnimating, showToast])
 
   // Ensure we have a bias location (auto-locate if needed)
   const ensureBiasLocation = useCallback(() => {
@@ -414,28 +417,103 @@ function App() {
     setIsSearching(false)
   }
 
-  // Handle clicking on a search result
+  // Handle clicking on a search result - shows action options
   const handleResultClick = (result) => {
     if (isAnimating) return
     
     const lat = parseFloat(result.lat)
     const lon = parseFloat(result.lon)
     
+    // Just select it, don't fly yet - let user choose action
     setSelectedPlace({
       name: result.display_name.split(',')[0],
       address: result.display_name,
       lat,
-      lon
+      lon,
+      distance: result.distance
     })
     
+    // Show marker on map
     setSearchMarker({
       position: [lat, lon],
       name: result.display_name.split(',')[0]
     })
     
-    // Fly to location with animation
-    flyTo([lat, lon], 17)
+    // Don't close sidebar - show the action buttons instead
   }
+
+  // Locate selected place - fly to it
+  const handleLocateSelected = useCallback(() => {
+    if (!selectedPlace || isAnimating) return
+    
+    flyTo([selectedPlace.lat, selectedPlace.lon], 17)
+    showToast(`📍 Going to ${selectedPlace.name}`)
+  }, [selectedPlace, isAnimating, flyTo, showToast])
+
+  // Native share handler
+  const handleShare = useCallback(async () => {
+    if (!selectedPlace) return
+    
+    const shareData = {
+      title: selectedPlace.name,
+      text: `${selectedPlace.name}\n${selectedPlace.address}`,
+      url: `https://www.openstreetmap.org/?mlat=${selectedPlace.lat}&mlon=${selectedPlace.lon}#map=17/${selectedPlace.lat}/${selectedPlace.lon}`
+    }
+    
+    // Try native share API first (mobile)
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Share failed:', err)
+        }
+        return
+      }
+    }
+    
+    // Fallback: copy to clipboard
+    const text = `${selectedPlace.name}\n${selectedPlace.address}\nCoordinates: ${selectedPlace.lat}, ${selectedPlace.lon}`
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast('📋 Copied to clipboard!')
+    } catch (err) {
+      showToast('❌ Failed to copy')
+    }
+  }, [selectedPlace, showToast])
+
+  // Native directions handler - shows route on map
+  const handleDirections = useCallback(async () => {
+    if (!selectedPlace || !biasLocation) {
+      showToast('📍 Need your location first')
+      return
+    }
+    
+    const [startLat, startLon] = biasLocation
+    const endLat = selectedPlace.lat
+    const endLon = selectedPlace.lon
+    
+    // Calculate straight-line distance
+    const distance = getDistanceKm(startLat, startLon, endLat, endLon)
+    
+    // Set route info for display
+    setRouteInfo({
+      start: biasLocation,
+      end: [endLat, endLon],
+      distance: distance,
+      destination: selectedPlace.name
+    })
+    
+    // Close sidebar and show route
+    setShowSidebar(false)
+    showToast(`🧭 ${formatDistance(distance)} to ${selectedPlace.name}`)
+  }, [selectedPlace, biasLocation, showToast])
+
+  // Clear route
+  const clearRoute = useCallback(() => {
+    setRouteInfo(null)
+  }, [])
 
   // Clear all markers and results
   const clearAll = () => {
@@ -444,6 +522,7 @@ function App() {
     setSelectedPlace(null)
     setActiveFilter(null)
     setSearchResults([])
+    setRouteInfo(null)
     // Keep bias location
   }
 
@@ -528,41 +607,85 @@ function App() {
             {/* Search Results */}
             {searchResults.length > 0 ? (
               <ul className="results-list">
-                {searchResults.map((result, index) => (
-                  <li key={index}>
-                    <button 
-                      className="result-item"
-                      onClick={() => handleResultClick(result)}
-                      disabled={isAnimating}
-                    >
-                      <div className="result-icon">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="#ea4335">
-                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                        </svg>
-                      </div>
-                      <div className="result-info">
-                        <strong>{result.display_name.split(',')[0]}</strong>
-                        <small>{result.display_name.split(',').slice(1, 3).join(',')}</small>
-                      </div>
-                      {result.distance !== undefined && (
-                        <span className="result-distance">{formatDistance(result.distance)}</span>
+                {searchResults.map((result, index) => {
+                  const isSelected = selectedPlace && 
+                    selectedPlace.lat === parseFloat(result.lat) && 
+                    selectedPlace.lon === parseFloat(result.lon)
+                  
+                  return (
+                    <li key={index} className={isSelected ? 'selected' : ''}>
+                      <button 
+                        className={`result-item ${isSelected ? 'active' : ''}`}
+                        onClick={() => handleResultClick(result)}
+                        disabled={isAnimating}
+                      >
+                        <div className="result-icon">
+                          <svg viewBox="0 0 24 24" width="24" height="24" fill={isSelected ? '#4285f4' : '#ea4335'}>
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                          </svg>
+                        </div>
+                        <div className="result-info">
+                          <strong>{result.display_name.split(',')[0]}</strong>
+                          <small>{result.display_name.split(',').slice(1, 3).join(',')}</small>
+                        </div>
+                        {result.distance !== undefined && (
+                          <span className="result-distance">{formatDistance(result.distance)}</span>
+                        )}
+                      </button>
+                      
+                      {/* Action buttons - show below selected result */}
+                      {isSelected && (
+                        <div className="result-actions">
+                          <button onClick={handleLocateSelected} className="btn-primary">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            </svg>
+                            Locate
+                          </button>
+                          <button onClick={handleDirections}>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                              <path d="M21.71 11.29l-9-9c-.39-.39-1.02-.39-1.41 0l-9 9c-.39.39-.39 1.02 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9c.39-.38.39-1.01 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/>
+                            </svg>
+                            Route
+                          </button>
+                          <button onClick={handleShare}>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
+                            </svg>
+                            Share
+                          </button>
+                        </div>
                       )}
-                    </button>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             ) : selectedPlace ? (
               <div className="place-card">
                 <h3>{selectedPlace.name}</h3>
                 <p>{selectedPlace.address}</p>
-                <div className="place-actions">
-                  <button onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lon}`, '_blank')}>
-                    Directions
+                {selectedPlace.distance !== undefined && (
+                  <p className="place-distance">
+                    📍 {formatDistance(selectedPlace.distance)} away
+                  </p>
+                )}
+                <div className="place-actions three-buttons">
+                  <button onClick={handleLocateSelected} className="btn-primary">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                    Locate
                   </button>
-                  <button onClick={() => {
-                    navigator.clipboard.writeText(`${selectedPlace.lat}, ${selectedPlace.lon}`)
-                    alert('Coordinates copied!')
-                  }}>
+                  <button onClick={handleDirections}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <path d="M21.71 11.29l-9-9c-.39-.39-1.02-.39-1.41 0l-9 9c-.39.39-.39 1.02 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9c.39-.38.39-1.01 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/>
+                    </svg>
+                    Route
+                  </button>
+                  <button onClick={handleShare}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
+                    </svg>
                     Share
                   </button>
                 </div>
@@ -611,7 +734,7 @@ function App() {
               trigger={geoTrigger} 
               onLocated={handleLocationFound}
               onError={(msg) => {
-                alert('Could not find your location: ' + msg)
+                showToast('📍 Could not find location')
                 setIsAnimating(false)
               }}
             />
@@ -652,6 +775,17 @@ function App() {
                 </Popup>
               </Marker>
             ))}
+            
+            {/* Route line */}
+            {routeInfo && (
+              <Polyline 
+                positions={[routeInfo.start, routeInfo.end]}
+                color="#4285f4"
+                weight={4}
+                opacity={0.8}
+                dashArray="10, 10"
+              />
+            )}
           </MapContainer>
 
           {/* Zoom Controls - Outside of Leaflet */}
@@ -722,6 +856,35 @@ function App() {
           </div>
         </div>
       </main>
+      
+      {/* Route Info Panel */}
+      {routeInfo && (
+        <div className="route-panel">
+          <div className="route-info">
+            <div className="route-icon">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="#4285f4">
+                <path d="M21.71 11.29l-9-9c-.39-.39-1.02-.39-1.41 0l-9 9c-.39.39-.39 1.02 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9c.39-.38.39-1.01 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/>
+              </svg>
+            </div>
+            <div className="route-details">
+              <strong>{formatDistance(routeInfo.distance)}</strong>
+              <span>to {routeInfo.destination}</span>
+            </div>
+          </div>
+          <button className="route-close" onClick={clearRoute}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </div>
+      )}
+      
+      {/* Toast Notification */}
+      {toast && (
+        <div className="toast">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
