@@ -483,7 +483,7 @@ function App() {
     }
   }, [selectedPlace, showToast])
 
-  // Native directions handler - shows route on map
+  // Native directions handler - fetches actual road route
   const handleDirections = useCallback(async () => {
     if (!selectedPlace || !biasLocation) {
       showToast('📍 Need your location first')
@@ -494,20 +494,57 @@ function App() {
     const endLat = selectedPlace.lat
     const endLon = selectedPlace.lon
     
-    // Calculate straight-line distance
-    const distance = getDistanceKm(startLat, startLon, endLat, endLon)
-    
-    // Set route info for display
-    setRouteInfo({
-      start: biasLocation,
-      end: [endLat, endLon],
-      distance: distance,
-      destination: selectedPlace.name
-    })
-    
-    // Close sidebar and show route
-    setShowSidebar(false)
-    showToast(`🧭 ${formatDistance(distance)} to ${selectedPlace.name}`)
+    try {
+      // Fetch actual road route from OSRM
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`
+      )
+      const data = await response.json()
+      
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const route = data.routes[0]
+        const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]) // Convert [lon,lat] to [lat,lon]
+        const distanceKm = route.distance / 1000 // Convert meters to km
+        const durationMin = Math.round(route.duration / 60) // Convert seconds to minutes
+        
+        setRouteInfo({
+          start: biasLocation,
+          end: [endLat, endLon],
+          distance: distanceKm,
+          duration: durationMin,
+          destination: selectedPlace.name,
+          coordinates: coordinates // Actual road path
+        })
+        
+        setShowSidebar(false)
+        showToast(`🧭 ${formatDistance(distanceKm)} • ${durationMin} min`)
+      } else {
+        // Fallback to straight line if routing fails
+        const straightDistance = getDistanceKm(startLat, startLon, endLat, endLon)
+        setRouteInfo({
+          start: biasLocation,
+          end: [endLat, endLon],
+          distance: straightDistance,
+          destination: selectedPlace.name,
+          coordinates: [biasLocation, [endLat, endLon]] // Straight line
+        })
+        setShowSidebar(false)
+        showToast(`📏 ${formatDistance(straightDistance)} straight`)
+      }
+    } catch (error) {
+      console.error('Routing failed:', error)
+      // Fallback to straight line
+      const straightDistance = getDistanceKm(startLat, startLon, endLat, endLon)
+      setRouteInfo({
+        start: biasLocation,
+        end: [endLat, endLon],
+        distance: straightDistance,
+        destination: selectedPlace.name,
+        coordinates: [biasLocation, [endLat, endLon]]
+      })
+      setShowSidebar(false)
+      showToast(`📏 ${formatDistance(straightDistance)}`)
+    }
   }, [selectedPlace, biasLocation, showToast])
 
   // Clear route
@@ -776,14 +813,13 @@ function App() {
               </Marker>
             ))}
             
-            {/* Route line */}
-            {routeInfo && (
+            {/* Route line - follows actual roads */}
+            {routeInfo && routeInfo.coordinates && (
               <Polyline 
-                positions={[routeInfo.start, routeInfo.end]}
+                positions={routeInfo.coordinates}
                 color="#4285f4"
-                weight={4}
-                opacity={0.8}
-                dashArray="10, 10"
+                weight={5}
+                opacity={0.7}
               />
             )}
           </MapContainer>
@@ -867,7 +903,10 @@ function App() {
               </svg>
             </div>
             <div className="route-details">
-              <strong>{formatDistance(routeInfo.distance)}</strong>
+              <strong>
+                {formatDistance(routeInfo.distance)}
+                {routeInfo.duration && ` • ${routeInfo.duration} min`}
+              </strong>
               <span>to {routeInfo.destination}</span>
             </div>
           </div>
